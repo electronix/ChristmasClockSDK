@@ -11,6 +11,8 @@ target_sources(${DRIVER_NAME} INTERFACE
   ${CMAKE_CURRENT_LIST_DIR}/src/LEDvertical.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/base64.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/SevenSeg.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/MatrixEffect.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/SnakeEffect.cpp
 )
 
 target_include_directories(${DRIVER_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)

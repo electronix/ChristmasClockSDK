@@ -1,6 +1,8 @@
 #include "SevenSeg.hpp"
 #include "led.hpp"
 
+#include <cctype>
+
 namespace ChristmasClock {
 
 const uint8_t SevenSeg::_offsets[4] = { 0, 8, 18, 26 };
@@ -136,6 +138,29 @@ void SevenSeg::SetDoublePoint(){
 void SevenSeg::ClearPoints(){
     _bmp(16, 6) = _background;
     _bmp(16, 9) = _background;
+}
+
+int SevenSeg::CharToHexValue(char c){
+    if(c >= '0' && c <= '9') return c -'0';
+    c = std::tolower(static_cast<unsigned char>(c));
+    if(c >= 'a' && c <= 'f') return 10 +(c -'a');
+    return -1;
+}
+
+void SevenSeg::SetMarqueeWindow(const std::string& text, int offset){
+    if(text.empty()) return;
+    int size = static_cast<int>(text.size());
+    for(int position = 0; position < 4; position++){
+        int index = offset +position;
+        index %= size;
+        if(index < 0) index += size;
+        int value = CharToHexValue(text[index]);
+        if(value < 0){
+            ClearDigit(position);
+        }else{
+            SetDigit(position, value);
+        }
+    }
 }
 
 void SevenSeg::SetNegative(){
