@@ -1,6 +1,8 @@
-# Christmas Clock
+# Multi-purpose 7-segment display
 
-Firmware for a Christmas countdown clock built around a Raspberry Pi Pico (RP2040) on a custom PCB. Four seven-segment digits made of 142 addressable RGB LEDs show a countdown or, when no countdown is running, the time of day. C++17 with the Pico SDK and CMake.
+Firmware for a multi-purpose seven-segment display built around a Raspberry Pi Pico (RP2040) on a custom PCB. Four seven-segment digits made of 142 addressable RGB LEDs show a countdown or, when no countdown is running, the time of day. C++17 with the Pico SDK and CMake.
+
+It is mainly used in larger meetings as a speaker timer: presenters get a fixed amount of time, the countdown shows what is left (turning from green through orange to red, and counting into negative when the time is exceeded), and between talks the display shows the time of day. Despite the repository name and the `ChristmasClock` names in the code, it has nothing to do with Christmas.
 
 ## What it does
 
