@@ -1,0 +1,12 @@
+# Normalize line endings: LF in the repo and in the working tree (also on Windows),
+# so shell scripts (start-env, entrypoint.sh) and the Dockerfile keep working under WSL/Linux.
+* text=auto eol=lf
+
+# Binary files: never touch line endings
+*.zip binary
+*.uf2 binary
+*.png binary
+*.jpg binary
+*.pdf binary
+*.stl binary
+*.3mf binary
