@@ -18,6 +18,7 @@ ChristmasClock::ChristmasClock() :
     _is_in_menu(false),
     _menu_number(0),
     _idle_seconds(0),
+    _adjust_seconds(CLOCK_SHOW_DELAY_S),
     _matrix_active(false),
     _snake_active(false),
     _countdown(300),
@@ -31,6 +32,7 @@ ChristmasClock::ChristmasClock() :
 bool ChristmasClock::EvaluateEvent(IR::NECEvent event){
     if(event != IR::NECEvent::NO_EVENT){
         _idle_seconds = 0;
+        _adjust_seconds = 0;
         _matrix_active = false;
     }
     switch(event){
@@ -155,7 +157,9 @@ void ChristmasClock::Tick(){
         _idle_seconds = 0;
     }else{
         _idle_seconds++;
-        if(_idle_seconds >= MATRIX_IDLE_TIMEOUT_S){
+        if(_adjust_seconds < CLOCK_SHOW_DELAY_S) _adjust_seconds++;
+        // With a valid wall clock the idle state shows the time of day instead of the screensaver.
+        if(_idle_seconds >= MATRIX_IDLE_TIMEOUT_S && !_wall.IsValid()){
             _matrix_active = true;
         }
     }
@@ -177,6 +181,7 @@ void ChristmasClock::Update() {
     uint16_t pressed = _touch.GetPressedPads();
     if(pressed != 0){
         _idle_seconds = 0;
+        _adjust_seconds = 0;
         _matrix_active = false;
     }
 
@@ -208,6 +213,22 @@ void ChristmasClock::Update() {
         _seg.Update();
         return;
     }
+
+    WallClock::DateTime now;
+    if(!_running && _adjust_seconds >= CLOCK_SHOW_DELAY_S && _wall.Now(now)){
+        // Cyan: its active channels are equal, so the hue stays the same at every brightness (mixed
+        // colours like warm white shift because the small gains round the channels unequally).
+        // Halved so two channels are not brighter than the single-channel green countdown.
+        _seg.SetForeground(ColorGRBa::CYAN * CLOCK_COLOR_GAIN);
+        _seg.ClearPoints();
+        _seg.SetNumber(now.hour * 100 + now.minute, 4);
+        if(now.second % 2 == 0){
+            _seg.SetDoublePoint();  // blinking colon, once per second
+        }
+        _seg.Update();
+        return;
+    }
+
     if(_time > _countdown_warning){
         _seg.SetForeground(ColorGRBa::GREEN);
     }else if(_time > _countdown_finishing){

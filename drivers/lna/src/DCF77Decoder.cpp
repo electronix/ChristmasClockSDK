@@ -113,9 +113,17 @@ void DCF77Decoder::Feed(bool level, uint32_t now_ms) {
 }
 
 void DCF77Decoder::OnEdge(bool new_level, uint32_t t_ms) {
+    _stats.edges++;
     if (_have_edge) {
         // The phase that just ended was at the old level and started at _last_edge_ms.
         uint32_t width = t_ms - _last_edge_ms;
+        if (width < kZeroMinMs) _stats.w_noise++;
+        else if (width < kZeroMaxMs) _stats.w_bit0++;
+        else if (width <= kOneMaxMs) _stats.w_bit1++;
+        else if (width < 700) _stats.w_odd++;
+        else if (width <= 1100) _stats.w_sec++;
+        else _stats.w_min++;
+
         bool bit;
         bool is_pulse = true;
         if (width >= kZeroMinMs && width < kZeroMaxMs) {
@@ -145,6 +153,7 @@ void DCF77Decoder::OnEdge(bool new_level, uint32_t t_ms) {
 }
 
 void DCF77Decoder::OnPulse(uint32_t start_ms, bool bit) {
+    _stats.pulses++;
     if (_have_pulse) {
         uint32_t period = start_ms - _last_start_ms;
         if (period >= kMinuteMarkMinMs && period <= kMinuteMarkMaxMs) {
