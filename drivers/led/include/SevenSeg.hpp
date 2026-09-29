@@ -5,6 +5,7 @@
 #include <memory>
 #include <cstdint>
 #include <ctime>
+#include <string>
 
 namespace ChristmasClock {
 
@@ -31,6 +32,18 @@ public:
     void SetDoublePoint();
     void ClearPoints();
 
+    // Marquee/ticker: shows the 4 characters of `text` starting at `offset` (wrapping around,
+    // modulo text.size()) across the 4 digit positions, left digit = position 0 = offset+0.
+    // Only what a seven-segment digit can actually render is supported: '0'-'9' and the hex
+    // letters a-f/A-F; anything else (e.g. a space used as a loop separator) is shown blank.
+    // Call with an incrementing offset (e.g. one step per timer tick) to scroll the text
+    // right-to-left across the display - position 0 is physically the left-most digit and
+    // position 3 the right-most when the board is held with the middle screw on its long edge
+    // at the bottom (confirmed against the PCB/Gerber mounting-hole layout: increasing bitmap
+    // x runs left-to-right and increasing bitmap y runs top-to-bottom in that orientation, same
+    // as the existing MM:SS digit layout already relies on - no flip needed).
+    void SetMarqueeWindow(const std::string& text, int offset);
+
     void SetForeground(ColorGRBa color) { _foreground = color; }
     void SetBackground(ColorGRBa color) { _background = color; }
 
@@ -48,6 +61,8 @@ private:
     ColorGRBa _background;
 
     void setSegment(int number, int offsetX, ColorGRBa color);
+
+    static int CharToHexValue(char c);
 
     void SetNegative();
     void ClearNegative();

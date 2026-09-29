@@ -9,19 +9,30 @@ const uint8_t ChristmasClock::_brightness[20] = { 2, 4, 5, 7, 9, 11, 14, 18, 22,
 ChristmasClock::ChristmasClock() :
     _led(pio0),
     _seg(_led),
+    _matrix(_led),
+    _snake(_led),
+    _touch(),
     _is_on(true),
-    _vol_index(7),
+    _running(false),
+    _vol_index(6),
     _is_in_menu(false),
     _menu_number(0),
-    _countdown(180),
-    _countdown_warning(60),
-    _countdown_finishing(30),
-    _time(180)
+    _idle_seconds(0),
+    _matrix_active(false),
+    _snake_active(false),
+    _countdown(300),
+    _countdown_warning(100),
+    _countdown_finishing(50),
+    _time(300)
 {
     _seg.SetGain(_brightness[_vol_index]);
 }
 
 bool ChristmasClock::EvaluateEvent(IR::NECEvent event){
+    if(event != IR::NECEvent::NO_EVENT){
+        _idle_seconds = 0;
+        _matrix_active = false;
+    }
     switch(event){
         case(IR::NECEvent::NO_EVENT): return false;
         case(IR::NECEvent::ON_OFF):
@@ -37,8 +48,8 @@ bool ChristmasClock::EvaluateEvent(IR::NECEvent event){
         case(IR::NECEvent::VOL_UP):
             {
                 _vol_index++;
-                if(_vol_index >= 20){
-                    _vol_index = 19;
+                if(_vol_index > MAX_VOL_INDEX){
+                    _vol_index = MAX_VOL_INDEX;
                 }
                 if(_is_on){
                     _seg.SetGain(_brightness[_vol_index]);
@@ -139,10 +150,60 @@ void ChristmasClock::SetTime(std::time_t time){
 }
 
 void ChristmasClock::Tick(){
-    _time--;
+    if(_running){
+        _time--;
+        _idle_seconds = 0;
+    }else{
+        _idle_seconds++;
+        if(_idle_seconds >= MATRIX_IDLE_TIMEOUT_S){
+            _matrix_active = true;
+        }
+    }
 }
 
 void ChristmasClock::Update() {
+    if(auto slider = _touch.GetSliderPosition()){
+        int index = (int)(*slider *MAX_VOL_INDEX +0.5f);
+        if(index < 0) index = 0;
+        if(index > MAX_VOL_INDEX) index = MAX_VOL_INDEX;
+        _vol_index = index;
+        if(_is_on){
+            _seg.SetGain(_brightness[_vol_index]);
+        }
+        _idle_seconds = 0;
+        _matrix_active = false;
+    }
+
+    uint16_t pressed = _touch.GetPressedPads();
+    if(pressed != 0){
+        _idle_seconds = 0;
+        _matrix_active = false;
+    }
+
+    bool tp1 = pressed & (uint16_t)TouchPad::TP1;
+    bool tp6 = pressed & (uint16_t)TouchPad::TP6;
+    if(tp1 && tp6){
+        // TP1+TP6 held together is the Snake-effect toggle gesture, not "-1 minute"/"-1 second".
+        _snake_active = !_snake_active;
+    }else{
+        if(tp1){ _time -= 60; }
+        if(pressed & (uint16_t)TouchPad::TP2){ _time += 60; }
+        if(pressed & (uint16_t)TouchPad::TP3){ Reset(); }
+        if(pressed & (uint16_t)TouchPad::TP4){ _running = !_running; }
+        if(pressed & (uint16_t)TouchPad::TP5){ _time += 1; }
+        if(tp6){ _time -= 1; }
+    }
+
+    if(_snake_active){
+        _snake.Update();
+        return;
+    }
+
+    if(_matrix_active){
+        _matrix.Update();
+        return;
+    }
+
     if(_is_in_menu) {
         _seg.Update();
         return;
