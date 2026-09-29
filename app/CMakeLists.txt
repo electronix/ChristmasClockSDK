@@ -17,7 +17,7 @@ add_executable(
     ${SRC}
 )
 
-target_link_libraries(${OUTPUT_NAME} pico_stdlib ir led lna power touch)
+target_link_libraries(${OUTPUT_NAME} pico_stdlib ir led power touch)
 
 target_include_directories(${OUTPUT_NAME} PRIVATE ${INCLUDE_DIRS})
 
