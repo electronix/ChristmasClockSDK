@@ -61,7 +61,6 @@ private:
     // Brightness of the cyan time of day relative to full (0-255), so it is about as bright as
     // the single-channel green countdown.
     static const int CLOCK_COLOR_GAIN = 128;
-
     bool EvaluateEventInMenu(IR::NECEvent event);
     int ConvertTimeToNumber(std::time_t time);
     std::time_t NumberToConvertTime(int number);
