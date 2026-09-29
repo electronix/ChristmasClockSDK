@@ -225,6 +225,11 @@ void ChristmasClock::Update() {
         if(now.second % 2 == 0){
             _seg.SetDoublePoint();  // blinking colon, once per second
         }
+        // Seconds dial: one LED of the outer ring (60 LEDs) jumps on each second, starting at
+        // the bottom left at second 0. Drawn after the digits, so it replaces that one pixel.
+        // Red is the complement of the cyan digits (good contrast) and a pure channel, so its hue
+        // does not shift when dimmed.
+        _seg.SetPerimeterPixel(now.second, ColorGRBa::RED);
         _seg.Update();
         return;
     }

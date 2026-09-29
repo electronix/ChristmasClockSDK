@@ -140,6 +140,34 @@ void SevenSeg::ClearPoints(){
     _bmp(16, 9) = _background;
 }
 
+void SevenSeg::SetPerimeterPixel(int index, ColorGRBa color){
+    index %= PERIMETER_LENGTH;
+    if(index < 0) index += PERIMETER_LENGTH;
+    // The table below starts at the bottom row's first pixel (1,12); the public index 0 is the
+    // next LED clockwise, the bottom pixel of digit 0's left column (0,11).
+    index = (index +1) %PERIMETER_LENGTH;
+
+    int x, y;
+    if(index == 0){                  // bottom-left: first pixel of digit 0's bottom row
+        x = 1;  y = 12;
+    }else if(index <= 5){            // left column, going up: y = 11..7
+        x = 0;  y = 12 -index;
+    }else if(index <= 10){           // left column, going up: y = 5..1 (no LED at y = 6)
+        x = 0;  y = 11 -index;
+    }else if(index <= 30){           // top row, left to right, 5 pixels per digit
+        int k = index -11;
+        x = _offsets[k /5] +1 +k %5;  y = 0;
+    }else if(index <= 35){           // right column of digit 3, going down: y = 1..5
+        x = _offsets[3] +6;  y = index -30;
+    }else if(index <= 40){           // right column, going down: y = 7..11
+        x = _offsets[3] +6;  y = index -29;
+    }else{                           // bottom row, right to left, 5 pixels per digit
+        int k = index -41;
+        x = _offsets[3 -k /5] +5 -k %5;  y = 12;
+    }
+    _bmp(x, y) = color;
+}
+
 int SevenSeg::CharToHexValue(char c){
     if(c >= '0' && c <= '9') return c -'0';
     c = std::tolower(static_cast<unsigned char>(c));

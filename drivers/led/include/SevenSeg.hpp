@@ -44,6 +44,16 @@ public:
     // as the existing MM:SS digit layout already relies on - no flip needed).
     void SetMarqueeWindow(const std::string& text, int offset);
 
+    // The 60 LEDs on the outer edge of the whole display (top and bottom row of all 4 digits, left
+    // column of digit 0, right column of digit 3) form a ring, e.g. a seconds dial. Index 0 is the
+    // bottom-left LED (lowest pixel of digit 0's left column, x=0,y=11); indexes run clockwise: up
+    // the left side, left to right along the top, down the right side, right to left along the
+    // bottom (index 59 = first pixel of the bottom row, x=1,y=12). Sets that one
+    // pixel to `color` in the bitmap (index is taken modulo PERIMETER_LENGTH). Redrawing the digits
+    // overwrites it again, so call this after drawing them.
+    static const int PERIMETER_LENGTH = 60;
+    void SetPerimeterPixel(int index, ColorGRBa color);
+
     void SetForeground(ColorGRBa color) { _foreground = color; }
     void SetBackground(ColorGRBa color) { _background = color; }
 
