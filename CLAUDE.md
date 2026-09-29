@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Firmware for a Raspberry Pi Pico (RP2040) based multi-purpose seven-segment display (mainly a speaker timer for larger meetings; despite the repo name and the `ChristmasClock` identifiers it has nothing to do with Christmas). Custom PCB with 142 addressable RGB LEDs (arranged into seven-segment digits), an IR remote receiver/transmitter, an MPR121 capacitive touch controller (slider + 6 pads), a DCF77 front end (on-board receiver unusable, DCF77 dropped 2026-09-29; time of day comes over USB serial, see `lna` and wall-clock notes below) and (planned) power management peripherals. C++17 / C11, built with the Pico SDK and CMake, cross-compiled for ARM (no native/host build target exists).
 
+## Open points and ideas (status 2026-09-29)
+
+Everything below is **not implemented** (details in the paragraphs referenced); the rest of this file describes what exists.
+- **Persistent settings** (brightness, default countdown length, ...): all state is RAM-only and resets at power-off. Raw `hardware_flash` struct near the end of flash is the recommended start, LittleFS is overkill — see "Persistent configuration".
+- **Time of day survives power loss**: no. It is set over USB (`tools/settime.html`) after every power-up. The only option still considered is a battery-backed RTC chip over I2C or SPI (needs the PCB or a breakout on the free pads; I2C1 is used by the touch controller) — see the DCF77 and "Free breakout pads" paragraphs. DCF77 itself is dropped for good, no external module planned.
+- **Serving `settime.html` from the board as a USB drive** (CDC + MSC composite with a read-only FAT12 image in flash): idea only, moderate effort, not requested so far — see "Idea, not implemented".
+- **`power` driver**: only a stub, although the hardware exists on the PCB (buck converter, two 3.3V LDOs, load switch) — see "power driver".
+- **Marquee text** (`SevenSeg::SetMarqueeWindow`): implemented in the display driver but not wired into the main loop or any UI state.
+- **Unused hardware**: the DCF77 front end (LNA sheet: coil, tank capacitors — C171-C173 were removed from the built board — transistors, U9) is still on the PCB but unused; a future PCB revision could drop it. `A0`/GPIO26 is free.
+- **Naming**: the device is a speaker-timer / multi-purpose display, but repo name and identifiers (`ChristmasClock`, `ChristmasClock.uf2`) still say "Christmas"; a rename was not requested.
+
 ## Build commands
 
 This is an embedded, cross-compiled project — there is no host build, no test suite, and no linter configured in the repo.
