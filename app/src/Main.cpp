@@ -7,6 +7,7 @@
 #include "Receiver.hpp"
 #include "Transmitter.hpp"
 #include "NECEventMapper.hpp"
+#include "lna.hpp"
 
 void countdown(uint n) {
     for (uint i = 0; i < n; i++) {
@@ -30,6 +31,7 @@ int main() {
     ChristmasClock::IR::Receiver recv(pio1);
 
     ChristmasClock::IR::NECEventMapper mapper(recv);
+    ChristmasClock::LNA dcf77;
 
     recv.UseReceivedCallback(IRQCallback);
 
@@ -42,6 +44,16 @@ int main() {
             next_tick += 1000000;
 
             trans.Transmit(clock.GetTime());
+        }
+        if(auto sync = dcf77.PollSync()){
+            auto& t = sync->time;
+            auto stats = dcf77.GetStats();
+            std::cout << "DCF77 sync: " << std::dec << std::setfill('0')
+                      << std::setw(4) << t.year << "-" << std::setw(2) << (int)t.month << "-" << std::setw(2) << (int)t.day
+                      << " " << std::setw(2) << (int)t.hour << ":" << std::setw(2) << (int)t.minute
+                      << (t.cest ? " CEST" : " CET") << " (+" << sync->age_ms << "ms)"
+                      << " frames ok/bad/lost: " << stats.frames_ok << "/" << stats.frames_bad << "/" << stats.frames_lost
+                      << std::endl;
         }
         next_update--;
         if(next_update <= 0){
