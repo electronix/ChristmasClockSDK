@@ -33,7 +33,18 @@ public:
     };
 
     struct Stats {
-        uint32_t frames_ok = 0;    // frames that passed all checks
+        uint32_t edges = 0;        // debounced level changes seen (0 = pin is dead/stuck)
+        uint32_t pulses = 0;       // 100/200ms carrier-reduction pulses seen (0 = no DCF77 signal)
+        // Every debounced signal phase (high or low) classified by its width. A clean DCF77 signal
+        // gives, per minute: 59 phases that are ~100/200ms (w_bit0 + w_bit1), 58 phases of
+        // ~800-900ms (w_sec), 1 phase of ~1800-1900ms (w_min), and nothing else.
+        uint32_t w_noise = 0;  // < 50ms
+        uint32_t w_bit0 = 0;   // 50-150ms
+        uint32_t w_bit1 = 0;   // 150-260ms
+        uint32_t w_odd = 0;    // 260-700ms (matches nothing in a DCF77 signal)
+        uint32_t w_sec = 0;    // 700-1100ms
+        uint32_t w_min = 0;    // > 1100ms
+        uint32_t frames_ok = 0;  // frames that passed all checks
         uint32_t frames_bad = 0;   // complete frames rejected (parity / range / fixed bits)
         uint32_t frames_lost = 0;  // frames broken by a missing/extra pulse
     };
@@ -47,6 +58,10 @@ public:
     bool TakeSync(Sync& out);
 
     const Stats& GetStats() const { return _stats; }
+
+    // Progress within the current frame: index of the last received bit (0-58), or -1 if not
+    // synchronized to a minute mark.
+    int BitIndex() const { return _index; }
 
     // Exposed for tests.
     static bool DecodeFrame(uint64_t bits, Time& out);

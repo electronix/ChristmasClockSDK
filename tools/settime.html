@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Christmas Clock – Zeit stellen</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --fg: #1d2530; --muted: #66707d; --line: #d9dee5;
+    --ok: #1a7f37; --warn: #9a6700; --err: #c62828; --accent: #1f6feb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --card: #1c2027; --fg: #e6e9ee; --muted: #9aa4b1; --line: #2c333d;
+            --ok: #4cc26b; --warn: #d4a72c; --err: #ff6b6b; --accent: #58a6ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; display: grid; gap: 12px; }
+  h1 { font-size: 1.25rem; margin: 4px 0 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--card); color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.err { background: var(--err); }
+  .muted { color: var(--muted); font-size: .9rem; }
+  .big { font: 600 1.6rem/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .02em; }
+  #log { height: 260px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+         padding: 8px 10px; font: .85rem/1.35 ui-monospace, "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; }
+  .tx { color: var(--accent); } .rx { color: var(--fg); } .info { color: var(--muted); } .bad { color: var(--err); }
+  label { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; }
+  #unsupported { display: none; border-color: var(--err); color: var(--err); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Christmas Clock – Zeit stellen</h1>
+
+  <div id="unsupported" class="card">
+    Dieser Browser unterstützt keine serielle Schnittstelle (Web Serial).
+    Bitte Chrome oder Edge am Computer verwenden.
+  </div>
+
+  <div class="card">
+    <div class="status"><span id="dot" class="dot"></span><span id="status">Nicht verbunden</span></div>
+    <p class="muted" id="hint">
+      Uhr per USB anstecken, dann „Mit Uhr verbinden“ und den Port der Uhr wählen (beim ersten Mal).
+      Danach verbindet sich die Seite selbst wieder, solange sie geöffnet bleibt, und antwortet,
+      sobald die Uhr nach der Zeit fragt.
+    </p>
+    <div class="row">
+      <button id="connect" class="primary">Mit Uhr verbinden</button>
+      <button id="send" disabled>Zeit jetzt senden</button>
+      <button id="disconnect" disabled>Trennen</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="muted">Zeit dieses Computers</div>
+    <div class="big" id="pc-time">–</div>
+    <div class="muted" id="last-sent">Noch nichts gesendet.</div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
+      <strong>Protokoll</strong>
+      <span class="row">
+        <label><input type="checkbox" id="hide-diag" checked> Diagnosezeilen ausblenden</label>
+        <button id="clear">Leeren</button>
+      </span>
+    </div>
+    <div id="log" aria-live="polite"></div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+const RP2040_VENDOR_ID = 0x2E8A;   // Raspberry Pi USB vendor id
+const BAUD = 115200;               // ignored by USB CDC, but required by the API
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  dot: $("dot"), status: $("status"), connect: $("connect"), send: $("send"), disconnect: $("disconnect"),
+  pcTime: $("pc-time"), lastSent: $("last-sent"), log: $("log"), hideDiag: $("hide-diag"), clear: $("clear"),
+  unsupported: $("unsupported"),
+};
+
+let port = null;          // the open SerialPort
+let reader = null;        // reader of the decoded text stream
+let writer = null;        // writer of the raw byte stream
+let readClosed = null;    // promise of the pipeTo() for the text decoder
+let connecting = false;
+let sendTimer = null;
+
+const pad = (n, w = 2) => String(n).padStart(w, "0");
+
+// "YYYY-MM-DD HH:MM:SS" in the computer's local time (incl. daylight saving).
+function formatLocal(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function setStatus(kind, text) {
+  els.dot.className = "dot " + kind;
+  els.status.textContent = text;
+}
+
+function log(kind, text) {
+  const isDiag = /^\[(heartbeat|adc)\]/.test(text);
+  const line = document.createElement("div");
+  line.className = kind;
+  line.dataset.diag = isDiag ? "1" : "";
+  line.textContent = text;
+  if (isDiag && els.hideDiag.checked) line.hidden = true;
+  const nearBottom = els.log.scrollHeight - els.log.scrollTop - els.log.clientHeight < 40;
+  els.log.appendChild(line);
+  while (els.log.childElementCount > 400) els.log.firstChild.remove();
+  if (nearBottom) els.log.scrollTop = els.log.scrollHeight;
+}
+
+els.hideDiag.addEventListener("change", () => {
+  for (const line of els.log.children) {
+    if (line.dataset.diag) line.hidden = els.hideDiag.checked;
+  }
+});
+els.clear.addEventListener("click", () => { els.log.textContent = ""; });
+
+function updateButtons() {
+  const open = !!port && !!writer;
+  els.connect.disabled = open || connecting;
+  els.send.disabled = !open;
+  els.disconnect.disabled = !open;
+}
+
+// --- sending the time -------------------------------------------------------------------------
+
+// Sends the time of the *next full second*, timed to that second, so the clock is set to within a
+// few milliseconds of the real time instead of up to a second off.
+function sendTime() {
+  if (!writer) return;
+  if (sendTimer) clearTimeout(sendTimer);
+  const now = Date.now();
+  const target = new Date(Math.ceil((now + 30) / 1000) * 1000);  // >= 30 ms ahead
+  sendTimer = setTimeout(async () => {
+    sendTimer = null;
+    if (!writer) return;
+    const text = `TIME ${formatLocal(target)}\n`;
+    try {
+      await writer.write(new TextEncoder().encode(text));
+      log("tx", "> " + text.trim());
+      els.lastSent.textContent = `Zuletzt gesendet: ${formatLocal(target)} (${new Date().toLocaleTimeString()})`;
+    } catch (err) {
+      log("bad", "Senden fehlgeschlagen: " + err.message);
+    }
+  }, target.getTime() - now);
+}
+
+// --- receiving --------------------------------------------------------------------------------
+
+function handleLine(line) {
+  if (!line) return;
+  log("rx", line);
+  if (line.startsWith("REQ TIME")) {
+    setStatus("ok", "Verbunden – Uhr fragt nach der Zeit");
+    sendTime();
+  } else if (line.startsWith("OK TIME")) {
+    setStatus("ok", "Verbunden – Zeit gestellt");
+  } else if (line.startsWith("ERR")) {
+    setStatus("warn", "Verbunden – Uhr meldet einen Fehler");
+  }
+}
+
+async function readLoop(textReader) {
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await textReader.read();
+      if (done) break;
+      buffer += value;
+      let idx;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        handleLine(buffer.slice(0, idx).replace(/\r$/, "").trim());
+        buffer = buffer.slice(idx + 1);
+      }
+      if (buffer.length > 2000) buffer = "";   // never grow without a newline
+    }
+  } catch (err) {
+    log("bad", "Lesefehler: " + err.message);
+  }
+}
+
+// --- connect / disconnect ---------------------------------------------------------------------
+
+async function openPort(p) {
+  if (connecting || port) return;
+  connecting = true;
+  updateButtons();
+  setStatus("warn", "Verbinde …");
+  try {
+    await p.open({ baudRate: BAUD });
+    // The clock only talks while a terminal has DTR asserted; browsers usually do this on open,
+    // but be explicit.
+    try { await p.setSignals({ dataTerminalReady: true, requestToSend: true }); } catch (_) {}
+
+    port = p;
+    writer = p.writable.getWriter();
+    const decoder = new TextDecoderStream();
+    readClosed = p.readable.pipeTo(decoder.writable).catch(() => {});
+    reader = decoder.readable.getReader();
+    setStatus("ok", "Verbunden – warte auf die Uhr");
+    log("info", "Verbunden.");
+    readLoop(reader).then(onPortGone);
+
+    // Do not rely on the clock's request alone: send once right after connecting.
+    setTimeout(sendTime, 400);
+  } catch (err) {
+    port = null; writer = null; reader = null;
+    setStatus("err", "Verbindung fehlgeschlagen: " + err.message);
+    log("bad", "Öffnen fehlgeschlagen: " + err.message);
+  } finally {
+    connecting = false;
+    updateButtons();
+  }
+}
+
+async function closePort() {
+  if (sendTimer) { clearTimeout(sendTimer); sendTimer = null; }
+  const p = port;
+  const r = reader, w = writer, rc = readClosed;
+  port = null; reader = null; writer = null; readClosed = null;
+  try { if (r) await r.cancel(); } catch (_) {}
+  try { if (rc) await rc; } catch (_) {}
+  try { if (w) { w.releaseLock(); } } catch (_) {}
+  try { if (p) await p.close(); } catch (_) {}
+}
+
+async function onPortGone() {
+  // The read loop ended: cable pulled, clock reset, or user pressed "Trennen".
+  const wasOpen = !!port;
+  await closePort();
+  updateButtons();
+  if (wasOpen) {
+    setStatus("warn", "Getrennt – warte auf die Uhr");
+    log("info", "Verbindung beendet.");
+  }
+}
+
+els.connect.addEventListener("click", async () => {
+  try {
+    const p = await navigator.serial.requestPort({ filters: [{ usbVendorId: RP2040_VENDOR_ID }] });
+    await openPort(p);
+  } catch (err) {
+    if (err.name !== "NotFoundError") log("bad", err.message);   // NotFoundError = dialog cancelled
+  }
+});
+els.send.addEventListener("click", sendTime);
+els.disconnect.addEventListener("click", async () => {
+  await closePort();
+  updateButtons();
+  setStatus("", "Nicht verbunden");
+  log("info", "Getrennt.");
+});
+
+// Reconnect on its own: at page load for ports the user already allowed, and whenever such a
+// port shows up again (cable plugged in).
+async function autoConnect() {
+  if (port || connecting) return;
+  const ports = await navigator.serial.getPorts();
+  const candidates = ports.filter((p) => (p.getInfo().usbVendorId === RP2040_VENDOR_ID));
+  for (const p of candidates) {
+    if (!port) await openPort(p);
+  }
+}
+
+// --- start ------------------------------------------------------------------------------------
+
+function tick() {
+  els.pcTime.textContent = formatLocal(new Date());
+}
+setInterval(tick, 250);
+tick();
+
+if (!("serial" in navigator)) {
+  els.unsupported.style.display = "block";
+  els.connect.disabled = true;
+  setStatus("err", "Web Serial nicht verfügbar");
+} else {
+  navigator.serial.addEventListener("connect", () => { setTimeout(autoConnect, 500); });
+  navigator.serial.addEventListener("disconnect", () => {
+    setStatus("warn", "Getrennt – warte auf die Uhr");
+  });
+  autoConnect();
+}
+</script>
+</body>
+</html>
