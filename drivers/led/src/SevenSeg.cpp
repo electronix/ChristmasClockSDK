@@ -143,6 +143,9 @@ void SevenSeg::ClearPoints(){
 void SevenSeg::SetPerimeterPixel(int index, ColorGRBa color){
     index %= PERIMETER_LENGTH;
     if(index < 0) index += PERIMETER_LENGTH;
+    // The table below starts at the bottom row's first pixel (1,12); the public index 0 is the
+    // next LED clockwise, the bottom pixel of digit 0's left column (0,11).
+    index = (index +1) %PERIMETER_LENGTH;
 
     int x, y;
     if(index == 0){                  // bottom-left: first pixel of digit 0's bottom row
