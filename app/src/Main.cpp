@@ -14,10 +14,11 @@
 // broadband noise into rail-to-rail swings on the DCF77 net (GPIO26/ADC0); no 77.5kHz carrier or 1Hz
 // pulse pattern was ever visible, neither on the pin nor on the scope, with the original tank, a
 // single 1.2nF tank cap, or shorted coil. A decoder (pulse widths, parities, 2-frame confirmation) was
-// written and host-tested, and ADC sampling was tried - it can be found in git history (branch
-// feature/wallclock-serial-time, drivers/lna) - but the hardware never delivered a usable signal.
+// written and host-tested, and ADC sampling was tried - it is in the git history (last commit that
+// still has drivers/lna: 6b1f1fd) - but the hardware never delivered a usable signal.
 // The time of day is therefore set from a PC over USB serial (SerialCommands, tools/settime.html).
-// An external DCF77 module on a free GPIO would be the only realistic way to get DCF77 working.
+// No external DCF77 module is planned either; if the time should survive power loss, a battery-backed
+// RTC chip over I2C/SPI is the option to consider.
 
 static const uint32_t HEARTBEAT_INTERVAL_S = 5;
 
