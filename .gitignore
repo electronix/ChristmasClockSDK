@@ -4,3 +4,8 @@ github-id
 # Claude Code / oh-my-claudecode tool state (also nested, e.g. hardware/.omc)
 .claude/
 .omc/
+
+# Hardware design files (schematic, PCB, Gerber, enclosure) are kept out of this public repo;
+# only hardware/README.txt is tracked.
+hardware/*
+!hardware/README.txt
