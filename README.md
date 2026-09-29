@@ -21,7 +21,7 @@ The easy way is `tools/settime.html`, a single-file Web Serial page for Chrome o
 
 ### DCF77
 
-DCF77 radio time reception does **not** work with the on-board receiver: its analog front end amplifies noise to full swing and no signal is ever visible. The driver was removed again (it remains in the git history); the comment at the top of `app/src/Main.cpp` explains why. An external DCF77 module would be the only realistic way to get it working.
+DCF77 radio time reception does **not** work with the on-board receiver: its analog front end amplifies noise to full swing and no signal is ever visible. The driver was removed again (it remains in the git history); the comment at the top of `app/src/Main.cpp` explains why. An external DCF77 module is not planned; if the time should ever survive power loss, a battery-backed RTC chip over I2C/SPI is the option to consider.
 
 ## Code layout
 
