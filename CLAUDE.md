@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Firmware for a Raspberry Pi Pico (RP2040) based Christmas countdown clock. Custom PCB with 142 addressable RGB LEDs (arranged into seven-segment digits), an IR remote receiver/transmitter, an MPR121 capacitive touch controller (slider + 6 pads), a DCF77 front end (on-board receiver unusable, DCF77 dropped 2026-09-29; time of day comes over USB serial, see `lna` and wall-clock notes below) and (planned) power management peripherals. C++17 / C11, built with the Pico SDK and CMake, cross-compiled for ARM (no native/host build target exists).
+Firmware for a Raspberry Pi Pico (RP2040) based multi-purpose seven-segment display (mainly a speaker timer for larger meetings; despite the repo name and the `ChristmasClock` identifiers it has nothing to do with Christmas). Custom PCB with 142 addressable RGB LEDs (arranged into seven-segment digits), an IR remote receiver/transmitter, an MPR121 capacitive touch controller (slider + 6 pads), a DCF77 front end (on-board receiver unusable, DCF77 dropped 2026-09-29; time of day comes over USB serial, see `lna` and wall-clock notes below) and (planned) power management peripherals. C++17 / C11, built with the Pico SDK and CMake, cross-compiled for ARM (no native/host build target exists).
 
 ## Build commands
 
